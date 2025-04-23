@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TuneTrack - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="dashboard-container">
+        <header>
+            <h1>Welcome to TuneTrack</h1>
+            <a href="{{ url_for('login') }}" class="logout-btn">Logout</a>
+        </header>
+        
+        <div class="dashboard-content">
+            <h2>Your Music Dashboard</h2>
+            <p>This is where your music journey begins!</p>
+            <!-- Dashboard content will go here -->
+        </div>
+    </div>
+</body>
+</html>
