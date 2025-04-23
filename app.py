@@ -1,20 +1,28 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import os
-from werkzeug.utils import secure_filename
+import subprocess
+import tempfile
 import json
 from datetime import datetime
+from werkzeug.utils import secure_filename
+import numpy as np
+from scipy.io import wavfile
+import hashlib
 
 app = Flask(__name__)
 app.secret_key = 'tunetrack_secret_key'  # for session management
 app.config['UPLOAD_FOLDER'] = 'static/songs'
+app.config['SAMPLE_FOLDER'] = 'static/samples'
 app.config['ALLOWED_EXTENSIONS'] = {'mp3', 'wav', 'ogg'}
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
-# Ensure the uploads folder exists
+# Ensure the uploads folders exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['SAMPLE_FOLDER'], exist_ok=True)
 
-# Path to the song stats JSON file
+# Path to the song stats and fingerprint database JSON files
 SONG_STATS_FILE = 'song_stats.json'
+FINGERPRINT_DB_FILE = 'fingerprint_db.json'
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
@@ -50,6 +58,106 @@ def get_song_list():
     songs.sort(key=lambda x: x['plays'], reverse=True)
     return songs
 
+def get_fingerprint_db():
+    if os.path.exists(FINGERPRINT_DB_FILE):
+        with open(FINGERPRINT_DB_FILE, 'r') as f:
+            return json.load(f)
+    return {}
+
+def save_fingerprint_db(db):
+    with open(FINGERPRINT_DB_FILE, 'w') as f:
+        json.dump(db, f)
+
+def extract_fingerprint(audio_path):
+    """Extract audio fingerprint using fpcalc (Chromaprint)"""
+    try:
+        # Run fpcalc to get fingerprint
+        result = subprocess.run(
+            ["fpcalc", "-json", audio_path], 
+            capture_output=True, 
+            text=True, 
+            check=True
+        )
+        fingerprint_data = json.loads(result.stdout)
+        return fingerprint_data
+    except (subprocess.SubprocessError, json.JSONDecodeError) as e:
+        print(f"Error extracting fingerprint: {e}")
+        return None
+
+def convert_to_wav(input_file, output_file):
+    """Convert audio file to WAV format using ffmpeg"""
+    try:
+        subprocess.run(
+            ["ffmpeg", "-i", input_file, "-ar", "44100", "-ac", "2", output_file],
+            capture_output=True,
+            check=True
+        )
+        return True
+    except subprocess.SubprocessError as e:
+        print(f"Error converting audio: {e}")
+        return False
+
+def calculate_fingerprint_similarity(fp1, fp2):
+    """Calculate similarity between two Chromaprint fingerprints"""
+    if not fp1 or not fp2 or 'fingerprint' not in fp1 or 'fingerprint' not in fp2:
+        return 0.0
+    
+    # Simple Hamming distance-based similarity
+    fp1_bin = bin(int(fp1['fingerprint'], 16))[2:].zfill(len(fp1['fingerprint']) * 4)
+    fp2_bin = bin(int(fp2['fingerprint'], 16))[2:].zfill(len(fp2['fingerprint']) * 4)
+    
+    # Compare the minimum length of both fingerprints
+    min_len = min(len(fp1_bin), len(fp2_bin))
+    matches = sum(1 for i in range(min_len) if fp1_bin[i] == fp2_bin[i])
+    
+    return matches / min_len if min_len > 0 else 0.0
+
+def match_audio_sample(sample_path):
+    """Match an audio sample against the fingerprint database"""
+    # Extract fingerprint from the sample
+    sample_fingerprint = extract_fingerprint(sample_path)
+    if not sample_fingerprint:
+        return None
+    
+    # Load fingerprint database
+    fingerprint_db = get_fingerprint_db()
+    
+    best_match = None
+    best_score = 0.0
+    
+    # Compare with each song in the database
+    for song_id, fingerprint_data in fingerprint_db.items():
+        similarity = calculate_fingerprint_similarity(sample_fingerprint, fingerprint_data)
+        
+        if similarity > best_score and similarity > 0.7:  # Set a threshold for matching
+            best_score = similarity
+            best_match = song_id
+    
+    if best_match:
+        return {
+            'song_id': best_match,
+            'confidence': best_score
+        }
+    
+    return None
+
+def fingerprint_all_songs():
+    """Generate fingerprints for all songs in the library"""
+    songs = get_song_list()
+    fingerprint_db = get_fingerprint_db()
+    
+    for song in songs:
+        filename = song['filename']
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        if filename not in fingerprint_db:
+            fingerprint = extract_fingerprint(filepath)
+            if fingerprint:
+                fingerprint_db[filename] = fingerprint
+    
+    save_fingerprint_db(fingerprint_db)
+    return len(fingerprint_db)
+
 @app.route('/')
 def home():
     return redirect(url_for('login'))
@@ -73,7 +181,14 @@ def dashboard():
         return redirect(url_for('login'))
     
     songs = get_song_list()
-    return render_template('dashboard.html', songs=songs)
+    # Get stats for total matches
+    total_matches = sum(song['plays'] for song in songs)
+    most_matched = songs[0] if songs else None
+    
+    return render_template('dashboard.html', 
+                          songs=songs, 
+                          total_matches=total_matches,
+                          most_matched=most_matched)
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
@@ -95,7 +210,8 @@ def upload():
             
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
             
             # Add/update the song info in stats
             stats = get_song_stats()
@@ -106,7 +222,16 @@ def upload():
                 }
             save_song_stats(stats)
             
-            flash('Song uploaded successfully!')
+            # Generate fingerprint for the new song
+            fingerprint = extract_fingerprint(filepath)
+            if fingerprint:
+                db = get_fingerprint_db()
+                db[filename] = fingerprint
+                save_fingerprint_db(db)
+                flash('Song uploaded and fingerprinted successfully!')
+            else:
+                flash('Song uploaded but fingerprinting failed. Please try again.')
+                
             return redirect(url_for('dashboard'))
         else:
             flash('Invalid file type. Allowed types are mp3, wav, ogg.')
@@ -130,6 +255,131 @@ def play_song(filename):
     save_song_stats(stats)
     
     return redirect(url_for('static', filename=f'songs/{filename}'))
+
+@app.route('/sample', methods=['GET', 'POST'])
+def sample():
+    """Handle audio sample submission for matching"""
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    
+    result = None
+    match_details = None
+    
+    if request.method == 'POST':
+        # Check if recording or file upload
+        if 'sample' in request.files:
+            file = request.files['sample']
+            
+            if file and allowed_file(file.filename):
+                # Save the sample file
+                filename = secure_filename(f"sample_{datetime.now().strftime('%Y%m%d%H%M%S')}.wav")
+                sample_path = os.path.join(app.config['SAMPLE_FOLDER'], filename)
+                file.save(sample_path)
+                
+                # Convert to WAV if needed
+                if not sample_path.lower().endswith('.wav'):
+                    wav_path = os.path.splitext(sample_path)[0] + '.wav'
+                    if convert_to_wav(sample_path, wav_path):
+                        sample_path = wav_path
+                
+                # Match the sample against the database
+                match_result = match_audio_sample(sample_path)
+                
+                if match_result:
+                    song_id = match_result['song_id']
+                    confidence = match_result['confidence']
+                    
+                    # Get song details
+                    stats = get_song_stats()
+                    if song_id in stats:
+                        # Increment play count
+                        stats[song_id]['plays'] += 1
+                        save_song_stats(stats)
+                    
+                    # Get song info for display
+                    song_name = os.path.splitext(song_id)[0]
+                    result = f"Match found: {song_name} (Confidence: {confidence:.2%})"
+                    
+                    # Get additional song details
+                    match_details = {
+                        'filename': song_id,
+                        'name': song_name,
+                        'confidence': f"{confidence:.2%}",
+                        'plays': stats.get(song_id, {}).get('plays', 1)
+                    }
+                else:
+                    result = "No match found. Try with a different sample or longer duration."
+            else:
+                result = "Invalid file. Please upload a supported audio format."
+                
+    # Get fingerprint stats
+    fingerprint_count = len(get_fingerprint_db())
+    
+    return render_template('sample.html', 
+                          result=result, 
+                          match_details=match_details,
+                          fingerprint_count=fingerprint_count)
+
+@app.route('/api/record-match', methods=['POST'])
+def record_match():
+    """API endpoint for recording matches from browser audio recording"""
+    if not session.get('logged_in'):
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    if not data or 'sample_data' not in data:
+        return jsonify({'error': 'No audio data provided'}), 400
+    
+    # Save audio data to a temporary file
+    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
+        temp_path = temp_file.name
+    
+    try:
+        # Process base64 encoded audio data (implementation depends on how audio is sent)
+        # ...
+
+        # Match the sample
+        match_result = match_audio_sample(temp_path)
+        
+        if match_result:
+            song_id = match_result['song_id']
+            confidence = match_result['confidence']
+            
+            # Increment play count
+            stats = get_song_stats()
+            if song_id in stats:
+                stats[song_id]['plays'] += 1
+                save_song_stats(stats)
+            
+            song_name = os.path.splitext(song_id)[0]
+            return jsonify({
+                'success': True,
+                'match': {
+                    'song_id': song_id,
+                    'name': song_name,
+                    'confidence': confidence
+                }
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'No match found'
+            })
+            
+    finally:
+        # Clean up temporary file
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+@app.route('/fingerprint-all', methods=['POST'])
+def fingerprint_all():
+    """Force fingerprinting of all songs in the library"""
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    
+    count = fingerprint_all_songs()
+    flash(f'Successfully fingerprinted {count} songs')
+    return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=True)

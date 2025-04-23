@@ -16,6 +16,7 @@
             <ul>
                 <li class="active"><a href="{{ url_for('dashboard') }}"><i class="fas fa-home"></i> Dashboard</a></li>
                 <li><a href="{{ url_for('upload') }}"><i class="fas fa-upload"></i> Upload Songs</a></li>
+                <li><a href="{{ url_for('sample') }}"><i class="fas fa-microphone"></i> Match Audio</a></li>
                 <li><a href="{{ url_for('login') }}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
             </ul>
         </nav>
@@ -44,19 +45,30 @@
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon"><i class="fas fa-play"></i></div>
+                <div class="stat-icon"><i class="fas fa-headphones"></i></div>
                 <div class="stat-data">
-                    <span class="stat-number">{{ songs|map(attribute='plays')|sum }}</span>
-                    <span class="stat-label">Total Plays</span>
+                    <span class="stat-number">{{ total_matches }}</span>
+                    <span class="stat-label">Total Matches</span>
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                <div class="stat-icon"><i class="fas fa-crown"></i></div>
                 <div class="stat-data">
-                    <span class="stat-number">{{ (songs|length * 3.5)|int }}</span>
-                    <span class="stat-label">Minutes of Music</span>
+                    <span class="stat-number">{{ most_matched.name if most_matched else 'None' }}</span>
+                    <span class="stat-label">Most Matched Song</span>
                 </div>
             </div>
+        </div>
+        
+        <div class="quick-actions">
+            <a href="{{ url_for('upload') }}" class="action-card">
+                <div class="action-icon"><i class="fas fa-upload"></i></div>
+                <div class="action-text">Upload Songs</div>
+            </a>
+            <a href="{{ url_for('sample') }}" class="action-card">
+                <div class="action-icon"><i class="fas fa-microphone"></i></div>
+                <div class="action-text">Match Audio</div>
+            </a>
         </div>
         
         <div class="song-library">
@@ -101,7 +113,7 @@
                                 <th>#</th>
                                 <th>Song</th>
                                 <th>Date Added</th>
-                                <th>Plays</th>
+                                <th>Matches</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -123,7 +135,7 @@
                                     <button class="play-button" data-song="{{ song.url }}" data-song-name="{{ song.name }}">
                                         <i class="fas fa-play"></i>
                                     </button>
-                                    <a href="{{ url_for('play_song', filename=song.filename) }}" class="action-btn" title="Download">
+                                    <a href="{{ url_for('static', filename='songs/' + song.filename) }}" class="action-btn" title="Download">
                                         <i class="fas fa-download"></i>
                                     </a>
                                 </td>

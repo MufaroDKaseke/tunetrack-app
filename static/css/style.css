@@ -736,3 +736,273 @@ header {
     0% { height: 5px; }
     100% { height: 80px; }
 }
+
+/* Audio sample matching styles */
+.sample-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+
+@media (min-width: 992px) {
+    .sample-container {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.sample-info {
+    background: #1e1e2f;
+    border-radius: 10px;
+    padding: 25px;
+}
+
+.db-stats {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.fingerprint-form {
+    margin-left: 20px;
+}
+
+.secondary-btn {
+    background: rgba(187, 91, 255, 0.2);
+    color: #bb5bff;
+}
+
+.secondary-btn:hover {
+    background: rgba(187, 91, 255, 0.3);
+}
+
+.matching-options {
+    margin-top: 30px;
+}
+
+.matching-options h2 {
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.matching-options p {
+    color: #a0a0a0;
+    margin-bottom: 20px;
+}
+
+.tabs {
+    display: flex;
+    margin-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    color: #a0a0a0;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.3s;
+    position: relative;
+}
+
+.tab-btn:hover {
+    color: #fff;
+}
+
+.tab-btn.active {
+    color: #bb5bff;
+}
+
+.tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: #bb5bff;
+}
+
+.tab-content {
+    padding: 10px;
+}
+
+.hidden {
+    display: none;
+}
+
+.record-container {
+    text-align: center;
+}
+
+.record-visualizer {
+    height: 150px;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.record-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.record-btn {
+    padding: 12px 25px;
+    margin-right: 15px;
+}
+
+.record-btn.recording {
+    background: #FF5050;
+}
+
+.record-btn.recording:hover {
+    background: #FF3333;
+}
+
+.timer {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #fff;
+    min-width: 80px;
+    text-align: left;
+}
+
+.record-tip {
+    color: #a0a0a0;
+    font-size: 0.9rem;
+}
+
+.record-tip i {
+    color: #bb5bff;
+}
+
+.match-results {
+    background: #1e1e2f;
+    border-radius: 10px;
+    padding: 25px;
+}
+
+.match-results h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+
+.result-card {
+    background: rgba(30, 30, 47, 0.6);
+    border-radius: 10px;
+    padding: 20px;
+}
+
+.result-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.result-header i {
+    font-size: 1.8rem;
+    margin-right: 15px;
+}
+
+.result-header i.success {
+    color: #4CAF50;
+}
+
+.result-header i.error {
+    color: #FF5050;
+}
+
+.result-header h3 {
+    margin: 0;
+    color: #fff;
+}
+
+.match-details {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.song-album-art {
+    width: 80px;
+    height: 80px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #bb5bff;
+    font-size: 2rem;
+    margin-right: 20px;
+}
+
+.song-details h4 {
+    margin: 0 0 10px 0;
+    color: #fff;
+    font-size: 1.2rem;
+}
+
+.song-details p {
+    margin: 5px 0;
+    color: #a0a0a0;
+}
+
+.audio-preview {
+    width: 100%;
+    margin-top: 20px;
+    border-radius: 10px;
+}
+
+.no-match-tips {
+    margin-top: 20px;
+}
+
+.no-match-tips h4 {
+    color: #fff;
+    margin-bottom: 10px;
+}
+
+.no-match-tips ul {
+    color: #a0a0a0;
+    margin-left: 20px;
+}
+
+.no-match-tips li {
+    margin-bottom: 5px;
+}
+
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.action-card {
+    background: linear-gradient(135deg, rgba(30, 30, 47, 0.8) 0%, rgba(45, 27, 54, 0.8) 100%);
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+.action-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.action-icon {
+    font-size: 2rem;
+    color: #bb5bff;
+    margin-bottom: 10px;
+}
+
+.action-text {
+    color: #fff;
+    font-weight: bold;
+}
