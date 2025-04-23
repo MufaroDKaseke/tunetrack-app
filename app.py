@@ -69,16 +69,35 @@ def save_fingerprint_db(db):
         json.dump(db, f)
 
 def extract_fingerprint(audio_path):
-    """Extract audio fingerprint using fpcalc (Chromaprint)"""
-    # Run fpcalc to get fingerprint
+    """Extract audio fingerprint using fpcalc (Chromaprint) and log output to file"""
+    # Create a unique log filename
+    log_filename = f"fingerprint_log_{datetime.now().strftime('%Y%m%d%H%M%S')}.txt"
+    log_path = os.path.join('logs', log_filename)
+    
+    # Ensure logs directory exists
+    os.makedirs('logs', exist_ok=True)
+    
+    # Run fpcalc command without try/except
     result = subprocess.run(
         ["fpcalc", "-json", audio_path], 
         capture_output=True, 
-        text=True, 
-        check=True
+        text=True
     )
-    fingerprint_data = json.loads(result.stdout)
-    return fingerprint_data
+    
+    # Log both stdout and stderr
+    with open(log_path, 'w') as log_file:
+        log_file.write(f"Command: fpcalc -json {audio_path}\n")
+        log_file.write(f"Return code: {result.returncode}\n")
+        log_file.write(f"STDOUT:\n{result.stdout}\n")
+        log_file.write(f"STDERR:\n{result.stderr}\n")
+    
+    # Try to parse fingerprint data even if command returned error
+    try:
+        fingerprint_data = json.loads(result.stdout)
+        return fingerprint_data
+    except json.JSONDecodeError:
+        # If parsing fails, return minimal structure with filename
+        return {"filename": os.path.basename(audio_path), "fingerprint": None}
 
 def convert_to_wav(input_file, output_file):
     """Convert audio file to WAV format using ffmpeg"""
