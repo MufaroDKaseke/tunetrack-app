@@ -8,6 +8,12 @@ from werkzeug.utils import secure_filename
 import numpy as np
 from scipy.io import wavfile
 import hashlib
+from dejavu import Dejavu
+from dejavu.logic.recognizer import FileRecognizer
+from dejavu.logic.decoder import get_audio_name_from_path
+from dejavu.database.mysql import MySQLDatabase
+from dejavu.config.settings import DEJAVU_DEFAULT_CONFIG
+import traceback
 
 app = Flask(__name__)
 app.secret_key = 'tunetrack_secret_key'  # for session management
@@ -23,6 +29,24 @@ os.makedirs(app.config['SAMPLE_FOLDER'], exist_ok=True)
 # Path to the song stats and fingerprint database JSON files
 SONG_STATS_FILE = 'song_stats.json'
 FINGERPRINT_DB_FILE = 'fingerprint_db.json'
+
+# Configure Dejavu
+DEJAVU_CONFIG = DEJAVU_DEFAULT_CONFIG
+# Update database settings as needed
+DEJAVU_CONFIG["database"] = {
+    "host": "127.0.0.1",
+    "user": "dejavu",
+    "password": "dejavu",
+    "database": "dejavu"
+}
+
+# Initialize Dejavu
+djv = None
+try:
+    djv = Dejavu(DEJAVU_CONFIG)
+except Exception as e:
+    print(f"Failed to initialize Dejavu: {e}")
+    print(traceback.format_exc())
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
@@ -69,7 +93,7 @@ def save_fingerprint_db(db):
         json.dump(db, f)
 
 def extract_fingerprint(audio_path):
-    """Extract audio fingerprint using fpcalc (Chromaprint) and log output to file"""
+    """Extract audio fingerprint using Dejavu and log output to file"""
     # Create a unique log filename
     log_filename = f"fingerprint_log_{datetime.now().strftime('%Y%m%d%H%M%S')}.txt"
     log_path = os.path.join('logs', log_filename)
@@ -77,27 +101,35 @@ def extract_fingerprint(audio_path):
     # Ensure logs directory exists
     os.makedirs('logs', exist_ok=True)
     
-    # Run fpcalc command without try/except
-    result = subprocess.run(
-        ["fpcalc", "-json", audio_path], 
-        capture_output=True, 
-        text=True
-    )
-    
-    # Log both stdout and stderr
+    # Log the operation
     with open(log_path, 'w') as log_file:
-        log_file.write(f"Command: fpcalc -json {audio_path}\n")
-        log_file.write(f"Return code: {result.returncode}\n")
-        log_file.write(f"STDOUT:\n{result.stdout}\n")
-        log_file.write(f"STDERR:\n{result.stderr}\n")
-    
-    # Try to parse fingerprint data even if command returned error
-    try:
-        fingerprint_data = json.loads(result.stdout)
-        return fingerprint_data
-    except json.JSONDecodeError:
-        # If parsing fails, return minimal structure with filename
-        return {"filename": os.path.basename(audio_path), "fingerprint": None}
+        log_file.write(f"Fingerprinting file: {audio_path}\n")
+        
+        try:
+            if djv is None:
+                log_file.write("Error: Dejavu is not initialized\n")
+                return {"filename": os.path.basename(audio_path), "fingerprint": None}
+            
+            # Get song name from path
+            song_name = os.path.splitext(os.path.basename(audio_path))[0]
+            
+            # Add song fingerprint to Dejavu
+            djv.fingerprint_file(audio_path, song_name)
+            
+            # Create a fingerprint record
+            fingerprint_data = {
+                "filename": os.path.basename(audio_path),
+                "fingerprint": song_name,  # Use song name as identifier
+                "dejavu_id": song_name
+            }
+            
+            log_file.write(f"Fingerprinting successful: {song_name}\n")
+            return fingerprint_data
+            
+        except Exception as e:
+            log_file.write(f"Error during fingerprinting: {e}\n")
+            log_file.write(traceback.format_exc())
+            return {"filename": os.path.basename(audio_path), "fingerprint": None}
 
 def convert_to_wav(input_file, output_file):
     """Convert audio file to WAV format using ffmpeg"""
@@ -113,64 +145,61 @@ def convert_to_wav(input_file, output_file):
         return False
 
 def calculate_fingerprint_similarity(fp1, fp2):
-    print(fp1)
-    print(fp2)
-    """Calculate similarity between two Chromaprint fingerprints"""
-    if not fp1 or not fp2 or 'fingerprint' not in fp1 or 'fingerprint' not in fp2:
-        return 0.0
-    
-    # Check for valid fingerprints
-    if not fp1['fingerprint'] or not fp2['fingerprint']:
-        return 0.0
-        
-    try:
-        # Convert fingerprints to binary, handling various formats
-        fp1_bin = bin(int(fp1['fingerprint'], 16))[2:].zfill(len(fp1['fingerprint']) * 4)
-        fp2_bin = bin(int(fp2['fingerprint'], 16))[2:].zfill(len(fp2['fingerprint']) * 4)
-        
-        # Compare the minimum length of both fingerprints
-        min_len = min(len(fp1_bin), len(fp2_bin))
-        matches = sum(1 for i in range(min_len) if fp1_bin[i] == fp2_bin[i])
-        
-        return matches / min_len if min_len > 0 else 0.0
-    except ValueError:
-        # Handle case where fingerprint isn't a valid hex string
-        print(f"Invalid fingerprint format: {fp1.get('fingerprint', 'None')} or {fp2.get('fingerprint', 'None')}")
-        return 0.0
+    """For Dejavu, we rely on its confidence score rather than binary comparison"""
+    # This function is mainly for backwards compatibility
+    # Dejavu provides its own confidence score during recognition
+    return 1.0 if fp1.get('dejavu_id') == fp2.get('dejavu_id') else 0.0
 
 def match_audio_sample(sample_path):
-    """Match an audio sample against the fingerprint database"""
-    # Extract fingerprint from the sample
-    sample_fingerprint = extract_fingerprint(sample_path)
-    if not sample_fingerprint:
+    """Match an audio sample against the Dejavu database"""
+    if djv is None:
+        print("Error: Dejavu is not initialized")
         return None
-    
-    # Load fingerprint database
-    fingerprint_db = get_fingerprint_db()
-    
-    best_match = None
-    best_score = 0.0
-    
-    # Compare with each song in the database
-    for song_id, fingerprint_data in fingerprint_db.items():
-        similarity = calculate_fingerprint_similarity(sample_fingerprint, fingerprint_data)
         
-        if similarity > best_score and similarity > 0.7:  # Set a threshold for matching
-            best_score = similarity
-            best_match = song_id
-    
-    if best_match:
-        return {
-            'song_id': best_match,
-            'confidence': best_score
-        }
-    
-    return None
+    try:
+        # Use Dejavu to recognize the file
+        results = djv.recognize(FileRecognizer, sample_path)
+        
+        if results and results["matches"]:
+            # Get the best match
+            best_match = results["matches"][0]
+            song_name = best_match["song_name"]
+            confidence = best_match["confidence"]
+            
+            # Find the filename corresponding to this song
+            song_files = os.listdir(app.config['UPLOAD_FOLDER'])
+            song_id = None
+            
+            for filename in song_files:
+                if os.path.splitext(filename)[0] == song_name:
+                    song_id = filename
+                    break
+            
+            if not song_id:
+                print(f"Song name {song_name} found in database but no file exists")
+                song_id = f"{song_name}.mp3"  # Default filename
+                
+            return {
+                'song_id': song_id,
+                'confidence': confidence / 100.0  # Normalize to 0-1 range
+            }
+        
+        return None
+        
+    except Exception as e:
+        print(f"Error during audio matching: {e}")
+        print(traceback.format_exc())
+        return None
 
 def fingerprint_all_songs():
-    """Generate fingerprints for all songs in the library"""
+    """Generate fingerprints for all songs in the library using Dejavu"""
+    if djv is None:
+        print("Error: Dejavu is not initialized")
+        return 0
+        
     songs = get_song_list()
     fingerprint_db = get_fingerprint_db()
+    count = 0
     
     for song in songs:
         filename = song['filename']
@@ -178,11 +207,12 @@ def fingerprint_all_songs():
         
         if filename not in fingerprint_db:
             fingerprint = extract_fingerprint(filepath)
-            if fingerprint:
+            if fingerprint and fingerprint.get('fingerprint'):
                 fingerprint_db[filename] = fingerprint
+                count += 1
     
     save_fingerprint_db(fingerprint_db)
-    return len(fingerprint_db)
+    return count
 
 @app.route('/')
 def home():
@@ -408,4 +438,7 @@ def fingerprint_all():
     return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
+    # Initialize database on startup
+    if djv is None:
+        print("WARNING: Dejavu could not be initialized. Fingerprinting will not work.")
     app.run(host='0.0.0.0', port=80, debug=True)
