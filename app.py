@@ -70,19 +70,15 @@ def save_fingerprint_db(db):
 
 def extract_fingerprint(audio_path):
     """Extract audio fingerprint using fpcalc (Chromaprint)"""
-    try:
-        # Run fpcalc to get fingerprint
-        result = subprocess.run(
-            ["fpcalc", "-json", audio_path], 
-            capture_output=True, 
-            text=True, 
-            check=True
-        )
-        fingerprint_data = json.loads(result.stdout)
-        return fingerprint_data
-    except (subprocess.SubprocessError, json.JSONDecodeError) as e:
-        print(f"Error extracting fingerprint: {e}")
-        return None
+    # Run fpcalc to get fingerprint
+    result = subprocess.run(
+        ["fpcalc", "-json", audio_path], 
+        capture_output=True, 
+        text=True, 
+        check=True
+    )
+    fingerprint_data = json.loads(result.stdout)
+    return fingerprint_data
 
 def convert_to_wav(input_file, output_file):
     """Convert audio file to WAV format using ffmpeg"""
