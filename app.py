@@ -113,19 +113,30 @@ def convert_to_wav(input_file, output_file):
         return False
 
 def calculate_fingerprint_similarity(fp1, fp2):
+    print(fp1)
+    print(fp2)
     """Calculate similarity between two Chromaprint fingerprints"""
     if not fp1 or not fp2 or 'fingerprint' not in fp1 or 'fingerprint' not in fp2:
         return 0.0
     
-    # Simple Hamming distance-based similarity
-    fp1_bin = bin(int(fp1['fingerprint'], 16))[2:].zfill(len(fp1['fingerprint']) * 4)
-    fp2_bin = bin(int(fp2['fingerprint'], 16))[2:].zfill(len(fp2['fingerprint']) * 4)
-    
-    # Compare the minimum length of both fingerprints
-    min_len = min(len(fp1_bin), len(fp2_bin))
-    matches = sum(1 for i in range(min_len) if fp1_bin[i] == fp2_bin[i])
-    
-    return matches / min_len if min_len > 0 else 0.0
+    # Check for valid fingerprints
+    if not fp1['fingerprint'] or not fp2['fingerprint']:
+        return 0.0
+        
+    try:
+        # Convert fingerprints to binary, handling various formats
+        fp1_bin = bin(int(fp1['fingerprint'], 16))[2:].zfill(len(fp1['fingerprint']) * 4)
+        fp2_bin = bin(int(fp2['fingerprint'], 16))[2:].zfill(len(fp2['fingerprint']) * 4)
+        
+        # Compare the minimum length of both fingerprints
+        min_len = min(len(fp1_bin), len(fp2_bin))
+        matches = sum(1 for i in range(min_len) if fp1_bin[i] == fp2_bin[i])
+        
+        return matches / min_len if min_len > 0 else 0.0
+    except ValueError:
+        # Handle case where fingerprint isn't a valid hex string
+        print(f"Invalid fingerprint format: {fp1.get('fingerprint', 'None')} or {fp2.get('fingerprint', 'None')}")
+        return 0.0
 
 def match_audio_sample(sample_path):
     """Match an audio sample against the fingerprint database"""
