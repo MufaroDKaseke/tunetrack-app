@@ -5,19 +5,143 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TuneTrack - Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
-<body>
-    <div class="dashboard-container">
-        <header>
-            <h1>Welcome to TuneTrack</h1>
-            <a href="{{ url_for('login') }}" class="logout-btn">Logout</a>
-        </header>
-        
-        <div class="dashboard-content">
-            <h2>Your Music Dashboard</h2>
-            <p>This is where your music journey begins!</p>
-            <!-- Dashboard content will go here -->
+<body class="dashboard-body">
+    <div class="nav-sidebar">
+        <div class="logo">
+            <h2>TuneTrack</h2>
+        </div>
+        <nav>
+            <ul>
+                <li class="active"><a href="{{ url_for('dashboard') }}"><i class="fas fa-home"></i> Dashboard</a></li>
+                <li><a href="{{ url_for('upload') }}"><i class="fas fa-upload"></i> Upload Songs</a></li>
+                <li><a href="{{ url_for('login') }}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+            </ul>
+        </nav>
+        <div class="nav-footer">
+            <p>© 2023 TuneTrack</p>
         </div>
     </div>
+
+    <div class="main-content">
+        <header class="dashboard-header">
+            <h1>Your Music Dashboard</h1>
+            <div class="user-profile">
+                <span>Welcome, {{ session.get('username', 'User') }}</span>
+                <div class="avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+            </div>
+        </header>
+        
+        <div class="dashboard-stats">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-music"></i></div>
+                <div class="stat-data">
+                    <span class="stat-number">{{ songs|length }}</span>
+                    <span class="stat-label">Total Songs</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-play"></i></div>
+                <div class="stat-data">
+                    <span class="stat-number">{{ songs|map(attribute='plays')|sum }}</span>
+                    <span class="stat-label">Total Plays</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                <div class="stat-data">
+                    <span class="stat-number">{{ (songs|length * 3.5)|int }}</span>
+                    <span class="stat-label">Minutes of Music</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="song-library">
+            <h2>Your Song Library</h2>
+            
+            {% if songs %}
+                <div class="song-player-container">
+                    <div class="current-playing">
+                        <div id="visualizer">
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                        </div>
+                        <div class="now-playing-info">
+                            <h3 id="now-playing-title">Select a song to play</h3>
+                            <div class="player-controls">
+                                <button id="prev-btn"><i class="fas fa-step-backward"></i></button>
+                                <button id="play-btn"><i class="fas fa-play"></i></button>
+                                <button id="next-btn"><i class="fas fa-step-forward"></i></button>
+                            </div>
+                            <div class="progress-container">
+                                <span id="current-time">0:00</span>
+                                <div class="progress-bar">
+                                    <div class="progress"></div>
+                                </div>
+                                <span id="duration">0:00</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <audio id="audio-player"></audio>
+                </div>
+                
+                <div class="songs-table-container">
+                    <table class="songs-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Song</th>
+                                <th>Date Added</th>
+                                <th>Plays</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for song in songs %}
+                            <tr data-song="{{ song.url }}" data-song-name="{{ song.name }}">
+                                <td>{{ loop.index }}</td>
+                                <td class="song-name">
+                                    <div class="song-info">
+                                        <div class="album-art">
+                                            <i class="fas fa-music"></i>
+                                        </div>
+                                        <span>{{ song.name }}</span>
+                                    </div>
+                                </td>
+                                <td>{{ song.uploaded }}</td>
+                                <td class="play-count">{{ song.plays }}</td>
+                                <td>
+                                    <button class="play-button" data-song="{{ song.url }}" data-song-name="{{ song.name }}">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                    <a href="{{ url_for('play_song', filename=song.filename) }}" class="action-btn" title="Download">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-library">
+                    <i class="fas fa-music empty-icon"></i>
+                    <p>Your library is empty. Upload some songs to get started!</p>
+                    <a href="{{ url_for('upload') }}" class="btn">Upload Songs</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>
 </html>

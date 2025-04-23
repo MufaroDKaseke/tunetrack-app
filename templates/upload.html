@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TuneTrack - Upload Songs</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body class="dashboard-body">
+    <div class="nav-sidebar">
+        <div class="logo">
+            <h2>TuneTrack</h2>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="{{ url_for('dashboard') }}"><i class="fas fa-home"></i> Dashboard</a></li>
+                <li class="active"><a href="{{ url_for('upload') }}"><i class="fas fa-upload"></i> Upload Songs</a></li>
+                <li><a href="{{ url_for('login') }}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+            </ul>
+        </nav>
+        <div class="nav-footer">
+            <p>© 2023 TuneTrack</p>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <header class="dashboard-header">
+            <h1>Upload New Songs</h1>
+            <div class="user-profile">
+                <span>Welcome, {{ session.get('username', 'User') }}</span>
+                <div class="avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+            </div>
+        </header>
+        
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="flash-messages">
+              {% for message in messages %}
+                <div class="flash-message">{{ message }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+        
+        <div class="upload-container">
+            <div class="upload-area" id="drop-area">
+                <form class="upload-form" method="POST" enctype="multipart/form-data">
+                    <div class="file-input-wrapper">
+                        <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                        <h3>Drag & Drop your audio files here</h3>
+                        <p>or</p>
+                        <input type="file" name="song" id="fileElem" accept=".mp3,.wav,.ogg" class="file-input">
+                        <label for="fileElem" class="btn">Select Files</label>
+                        <p class="file-types">Supported formats: MP3, WAV, OGG</p>
+                    </div>
+                    
+                    <div class="selected-file" id="selected-file">
+                        <p>No file selected</p>
+                    </div>
+                    
+                    <button type="submit" class="btn upload-btn">
+                        <i class="fas fa-upload"></i> Upload Song
+                    </button>
+                </form>
+            </div>
+            
+            <div class="upload-info">
+                <h3>Upload Guidelines</h3>
+                <ul>
+                    <li><i class="fas fa-check"></i> Maximum file size: 16MB</li>
+                    <li><i class="fas fa-check"></i> Supported formats: MP3, WAV, OGG</li>
+                    <li><i class="fas fa-check"></i> Use clear file names</li>
+                    <li><i class="fas fa-check"></i> Ensure you have rights to upload the song</li>
+                </ul>
+                
+                <div class="upload-benefits">
+                    <h3>Benefits</h3>
+                    <div class="benefit">
+                        <i class="fas fa-chart-line"></i>
+                        <div>
+                            <h4>Track Plays</h4>
+                            <p>Monitor how many times your songs are played</p>
+                        </div>
+                    </div>
+                    <div class="benefit">
+                        <i class="fas fa-mobile-alt"></i>
+                        <div>
+                            <h4>Listen Anywhere</h4>
+                            <p>Access your music from any device</p>
+                        </div>
+                    </div>
+                    <div class="benefit">
+                        <i class="fas fa-share-alt"></i>
+                        <div>
+                            <h4>Easy Sharing</h4>
+                            <p>Share your music with friends and fans</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+</body>
+</html>
